@@ -98,24 +98,27 @@
         </section>
         @endif
 
-        {{-- Produk terlaris --}}
-        @if ($bestSellers->isNotEmpty())
-            <section id="terlaris" class="scroll-mt-24 bg-white">
+        {{-- Produk per kategori --}}
+        @foreach ($sections as $section)
+            @php($category = $section['category'])
+            <section id="kategori-{{ $category->slug }}" class="scroll-mt-24 bg-white">
                 <div class="mx-auto max-w-6xl px-5 py-10 sm:px-8 md:py-14">
-                    <div class="max-w-2xl">
-                        <span class="{{ $badge }}">{!! $star !!} Pilihan Terbaik</span>
-                        <h2 class="mt-4 text-[26px] font-bold tracking-tight text-[#0A0F1F] sm:text-4xl">Produk Terlaris</h2>
-                        <span aria-hidden="true" class="mt-3 block h-1 w-14 rounded-full bg-[#F59E0B]"></span>
-                        <p class="mt-4 max-w-[650px] text-sm leading-relaxed text-[#6B7280] sm:text-base">Langganan favorit yang paling banyak dipilih pelanggan ProAkses.</p>
+                    <div class="flex flex-wrap items-end justify-between gap-4">
+                        <div class="max-w-2xl">
+                            <span class="{{ $badge }}">{!! $star !!} Kategori</span>
+                            <h2 class="mt-4 text-[26px] font-bold tracking-tight text-[#0A0F1F] sm:text-4xl">{{ $category->name }}</h2>
+                            <span aria-hidden="true" class="mt-3 block h-1 w-14 rounded-full bg-[#F59E0B]"></span>
+                        </div>
+                        <a href="{{ route('products.index', ['kategori' => $category->slug]) }}" class="text-sm font-semibold text-[#0A0F1F] hover:text-[#F59E0B]">Lihat semua {{ $category->name }}</a>
                     </div>
-                    <div class="mt-10 grid grid-cols-1 items-stretch gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 lg:gap-5 xl:gap-6">
-                        @foreach ($bestSellers as $product)
-                            <x-store.product-card :product="$product" layout="featured" />
+                    <div class="mt-10 grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
+                        @foreach ($section['products']->take(8) as $product)
+                            <x-store.product-card :product="$product" />
                         @endforeach
                     </div>
                 </div>
             </section>
-        @endif
+        @endforeach
 
         {{-- Semua produk --}}
         <section id="produk" class="scroll-mt-24 bg-white">

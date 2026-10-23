@@ -5,10 +5,11 @@
     $offer = $product->saleOptions()->first();
     $url = route('products.show', $product->slug);
     $stock = (int) $product->stock_count;
-    $sold = (int) $product->sold_count;
     $unit = $offer['months'] === 1 ? '/bulan' : '/'.$offer['months'].' bulan';
     $points = array_slice($product->highlights ?? [], 0, 3);
     $discountLabel = 'Diskon '.$offer['discount'].'%';
+    $waNumber = \App\Support\Whatsapp::number();
+    $waUrl = \App\Support\Whatsapp::url(\App\Support\Whatsapp::productMessage($product));
 @endphp
 
 @if ($layout === 'featured')
@@ -43,9 +44,9 @@
     </article>
 @else
     <article class="group flex h-full flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white p-2 shadow-[0_8px_30px_rgba(15,23,42,0.06)] transition duration-300 hover:shadow-[0_20px_45px_rgba(15,23,42,0.13)] sm:rounded-[2rem] sm:p-3.5">
-        <a href="{{ $url }}" tabindex="-1" aria-hidden="true" class="relative block aspect-[5/4] overflow-hidden rounded-xl bg-slate-100 sm:rounded-[1.35rem]">
+        <a href="{{ $url }}" tabindex="-1" aria-hidden="true" class="relative block aspect-video overflow-hidden rounded-xl bg-slate-100 sm:rounded-[1.35rem]">
             @if ($product->image_url)
-                <img src="{{ $product->image_url }}" alt="" width="400" height="320" loading="lazy" class="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+                <img src="{{ $product->image_url }}" alt="" width="400" height="225" loading="lazy" class="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105" />
             @endif
         </a>
 
@@ -57,11 +58,8 @@
             @else
                 <span class="inline-flex items-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-xs font-bold text-emerald-700 ring-1 ring-inset ring-emerald-200 sm:px-2.5 sm:py-1 sm:text-xs">Stok tersedia</span>
             @endif
-            @if ($sold > 0)
-                <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-xs font-bold text-amber-700 ring-1 ring-inset ring-amber-200 sm:px-2.5 sm:py-1 sm:text-xs">
-                    <svg class="h-2.5 w-2.5 sm:h-3 sm:w-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M3 12a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-4Zm5-4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V8Zm5-4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1V4Z"/></svg>
-                    {{ number_format($sold, 0, ',', '.') }} akun terjual
-                </span>
+            @if ($offer['discount'] > 0)
+                <span class="inline-flex items-center gap-1 rounded-full border border-[#10B981] bg-white px-1.5 py-0.5 text-xs font-bold text-[#047857] motion-safe:animate-badge-blink sm:px-2.5 sm:py-1" aria-label="{{ $discountLabel }}"><span>Diskon</span><span class="leading-none">{{ $offer['discount'] }}%</span></span>
             @endif
         </div>
 
@@ -90,8 +88,10 @@
                 </ul>
             @endif
             <div class="mt-3 flex items-stretch gap-2 sm:mt-4 sm:gap-3">
-                @if ($offer['discount'] > 0)
-                    <span class="flex shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-2xl border border-[#10B981] bg-white px-2 py-1 text-xs font-bold tracking-[-0.01em] text-[#047857] motion-safe:animate-badge-blink sm:px-3.5 sm:py-1.5 sm:text-sm" aria-label="{{ $discountLabel }}"><span>Diskon</span><span class="leading-none">{{ $offer['discount'] }}%</span></span>
+                @if ($waNumber)
+                    <a href="{{ $waUrl }}" target="_blank" rel="noopener" aria-label="Tanya {{ $product->name }} via WhatsApp" class="flex shrink-0 items-center justify-center rounded-2xl border border-[#25D366] bg-white px-2.5 text-lg text-[#25D366] transition hover:bg-[#25D366]/10 sm:px-3.5 sm:text-xl">
+                        <x-store.brand-icon name="whatsapp" />
+                    </a>
                 @endif
                 <a href="{{ $url }}" class="btn-shine flex min-w-0 flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-2xl bg-gradient-to-r from-[#FBBF24] to-[#F59E0B] px-2 py-1 text-xs font-semibold text-[#0A0F1F] transition-all duration-300 ease-out hover:-translate-y-0.5 hover:brightness-105 sm:gap-1.5 sm:px-4 sm:py-1.5 sm:text-sm">Beli</a>
             </div>

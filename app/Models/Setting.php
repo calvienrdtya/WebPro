@@ -25,6 +25,9 @@ class Setting extends Model
 
     public const CHAT_WA_ENABLED = 'chat.wa_enabled';
 
+    /** Teks pembuka chat WhatsApp: kunci chat.wa_message.{jenis}; kosong = pakai bawaan di config proakses.whatsapp_messages. */
+    public const WA_MESSAGE_PREFIX = 'chat.wa_message.';
+
     public const QRIS_IMAGE = 'payment.qris_image';
 
     /** Pengingat perpanjangan ke pelanggan (bawaan di config proakses.renewal_reminder). */

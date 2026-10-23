@@ -47,7 +47,7 @@ class ShopKnowledge
 
         foreach ($this->activeProducts() as $product) {
             $lines[] = '';
-            $lines[] = "### {$product->name} ({$product->category->label()})";
+            $lines[] = "### {$product->name} ({$product->category->name})";
             $lines[] = '- Halaman produk: '.route('products.show', $product->slug);
             $lines[] = '- Stok: '.($product->stock_count > 0 ? "{$product->stock_count} akun tersedia" : 'habis');
 

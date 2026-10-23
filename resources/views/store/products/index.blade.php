@@ -2,9 +2,9 @@
 
 @php
     // Label kategori AI sudah diawali "Akun" ("Akun AI"), kategori lain belum.
-    $categoryName = $category ? (str_starts_with($category->label(), 'Akun') ? $category->label() : 'Akun '.$category->label()) : null;
+    $categoryName = $category ? (str_starts_with($category->name, 'Akun') ? $category->name : 'Akun '.$category->name) : null;
     $heading = $category ? $categoryName.' Premium' : 'Semua Produk';
-    $canonical = route('products.index', $category ? ['kategori' => $category->value] : []);
+    $canonical = route('products.index', $category ? ['kategori' => $category->slug] : []);
     $desc = $category
         ? "Daftar {$categoryName} premium di ProAkses: harga rupiah, pilihan durasi, dan garansi tersedia."
         : 'Daftar akun AI premium, streaming, dan tools kreatif di ProAkses: harga rupiah, pilihan durasi, dan garansi tersedia.';
@@ -31,7 +31,7 @@
         'itemListElement' => array_values(array_filter([
             ['@type' => 'ListItem', 'position' => 1, 'name' => 'Beranda', 'item' => route('home')],
             ['@type' => 'ListItem', 'position' => 2, 'name' => 'Produk', 'item' => route('products.index')],
-            $category ? ['@type' => 'ListItem', 'position' => 3, 'name' => $category->label(), 'item' => $canonical] : null,
+            $category ? ['@type' => 'ListItem', 'position' => 3, 'name' => $category->name, 'item' => $canonical] : null,
         ])),
     ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) !!}</script>
 @endpush
@@ -45,7 +45,7 @@
                 @if ($category)
                     <li><a href="{{ route('products.index') }}" class="transition hover:text-[#F59E0B]">Produk</a></li>
                     <li aria-hidden="true" class="text-[#D1D5DB]">/</li>
-                    <li aria-current="page" class="font-medium text-[#0A0F1F]">{{ $category->label() }}</li>
+                    <li aria-current="page" class="font-medium text-[#0A0F1F]">{{ $category->name }}</li>
                 @else
                     <li aria-current="page" class="font-medium text-[#0A0F1F]">Produk</li>
                 @endif
@@ -63,14 +63,14 @@
                 <a href="{{ route('products.index', $q !== '' ? ['q' => $q] : []) }}" @if (! $category) aria-current="page" @endif
                     class="{{ $pill }} {{ ! $category ? 'border-[#F59E0B] bg-[#F59E0B]/15 text-[#0A0F1F]' : 'border-[#E5E7EB] bg-white text-[#374151] hover:border-[#F59E0B]' }}">Semua</a>
                 @foreach ($categories as $c)
-                    <a href="{{ route('products.index', array_filter(['kategori' => $c->value, 'q' => $q])) }}" @if ($category === $c) aria-current="page" @endif
-                        class="{{ $pill }} {{ $category === $c ? 'border-[#F59E0B] bg-[#F59E0B]/15 text-[#0A0F1F]' : 'border-[#E5E7EB] bg-white text-[#374151] hover:border-[#F59E0B]' }}">{{ $c->label() }}</a>
+                    <a href="{{ route('products.index', array_filter(['kategori' => $c->slug, 'q' => $q])) }}" @if ($category?->id === $c->id) aria-current="page" @endif
+                        class="{{ $pill }} {{ $category?->id === $c->id ? 'border-[#F59E0B] bg-[#F59E0B]/15 text-[#0A0F1F]' : 'border-[#E5E7EB] bg-white text-[#374151] hover:border-[#F59E0B]' }}">{{ $c->name }}</a>
                 @endforeach
             </nav>
 
             <form method="GET" action="{{ route('products.index') }}" role="search" class="flex w-full gap-2 sm:w-80">
                 @if ($category)
-                    <input type="hidden" name="kategori" value="{{ $category->value }}">
+                    <input type="hidden" name="kategori" value="{{ $category->slug }}">
                 @endif
                 <label for="q" class="sr-only">Cari produk</label>
                 <input id="q" name="q" type="search" value="{{ $q }}" placeholder="Cari produk" maxlength="60" autocomplete="off"

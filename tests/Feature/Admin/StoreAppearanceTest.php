@@ -80,7 +80,7 @@ class StoreAppearanceTest extends TestCase
         $this->assertStringContainsString('alt="Toko Uji"', $html);
         $this->assertStringContainsString(Storage::disk('uploads')->url($logo), $html);
         $this->assertStringContainsString('Tagline uji', $html);
-        $this->assertStringContainsString('mailto:cs@uji.test', $html);
+        $this->assertStringNotContainsString('mailto:cs@uji.test', $html); // email tidak lagi tampil di footer
         $this->assertStringNotContainsString('Dibuat untuk Gen Z Indonesia', $html);
 
         $this->post('/admin/tampilan/identitas', ['name' => 'Toko Uji', 'remove_logo' => true])->assertSessionHas('success');

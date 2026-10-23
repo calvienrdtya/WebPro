@@ -7,7 +7,9 @@ use App\Models\Order;
 use App\Models\Product;
 use App\Models\Setting;
 use App\Models\User;
+use App\Support\StoreProfile;
 use App\Support\Whatsapp;
+use Illuminate\Support\Once;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -127,7 +129,7 @@ class WhatsappChatTest extends TestCase
     {
         $this->actingAs(User::factory()->create(['is_admin' => true]));
 
-        $this->get('/admin/pengaturan')->assertInertia(fn ($page) => $page->where('chat', ['ai' => true, 'wa' => true, 'number' => '6281777889900']));
+        $this->get('/admin/pengaturan')->assertInertia(fn ($page) => $page->where('chat.ai', true)->where('chat.wa', true)->where('chat.number', '6281777889900'));
     }
 
     public function test_each_switch_changes_only_its_own_setting_and_takes_effect_in_the_store(): void
@@ -165,5 +167,55 @@ class WhatsappChatTest extends TestCase
         $this->actingAs(User::factory()->create())->put('/admin/pengaturan/chat', ['chat_ai_enabled' => false, 'chat_wa_enabled' => false])->assertForbidden();
         $this->assertTrue(Setting::bool(Setting::CHAT_AI_ENABLED, true));
         $this->assertTrue(Setting::bool(Setting::CHAT_WA_ENABLED, true));
+    }
+
+    // ---------- teks pembuka chat ----------
+
+    public function test_product_link_opens_chat_with_the_default_product_message(): void
+    {
+        $product = Product::factory()->create(['name' => 'Netflix Premium', 'slug' => 'netflix']);
+        $expected = 'Halo '.StoreProfile::name().', saya mau tanya produk Netflix Premium.';
+
+        $this->assertSame($expected, Whatsapp::productMessage($product));
+        $this->get('/produk')->assertSee('?text='.rawurlencode($expected), false);
+        $this->get('/produk/netflix')->assertSee('?text='.rawurlencode($expected), false);
+    }
+
+    public function test_admin_can_customise_both_messages_and_the_store_uses_them(): void
+    {
+        $this->actingAs(User::factory()->create(['is_admin' => true]));
+        $product = Product::factory()->create(['name' => 'Netflix Premium', 'slug' => 'netflix']);
+
+        $this->put('/admin/pengaturan/pesan-wa', ['product' => 'Kak, mau order {produk} di {toko}. Link: {link}', 'general' => 'Hai {toko}!'])
+            ->assertSessionHasNoErrors()->assertSessionHas('success');
+        Once::flush();
+
+        $message = 'Kak, mau order Netflix Premium di '.StoreProfile::name().'. Link: '.route('products.show', 'netflix');
+        $this->assertSame($message, Whatsapp::productMessage($product));
+        $this->get('/produk')->assertSee('?text='.rawurlencode($message), false);
+        $this->assertSame('Hai '.StoreProfile::name().'!', $this->chatConfigOf()['waMessage']);
+    }
+
+    public function test_unknown_placeholders_and_too_long_messages_are_rejected(): void
+    {
+        $this->actingAs(User::factory()->create(['is_admin' => true]));
+
+        $this->put('/admin/pengaturan/pesan-wa', ['product' => 'Mau {prodak}', 'general' => 'Mau beli {produk}'])
+            ->assertSessionHasErrors(['product', 'general']);
+        $this->put('/admin/pengaturan/pesan-wa', ['product' => str_repeat('a', 301), 'general' => ''])->assertSessionHasErrors('product');
+        $this->assertNull(Setting::get(Setting::WA_MESSAGE_PREFIX.'product'));
+    }
+
+    public function test_empty_or_default_text_falls_back_to_the_default(): void
+    {
+        $this->actingAs(User::factory()->create(['is_admin' => true]));
+        $this->put('/admin/pengaturan/pesan-wa', ['product' => 'Custom {produk}', 'general' => 'Custom'])->assertSessionHasNoErrors();
+
+        $this->put('/admin/pengaturan/pesan-wa', ['product' => '', 'general' => config('proakses.whatsapp_messages.general')])->assertSessionHasNoErrors();
+        Once::flush();
+
+        $this->assertSame(config('proakses.whatsapp_messages.product'), Whatsapp::template('product'));
+        $this->assertSame(config('proakses.whatsapp_messages.general'), Whatsapp::template('general'));
+        $this->assertSame('', Setting::get(Setting::WA_MESSAGE_PREFIX.'general'));
     }
 }

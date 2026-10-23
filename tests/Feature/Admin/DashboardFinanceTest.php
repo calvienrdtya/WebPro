@@ -114,7 +114,48 @@ class DashboardFinanceTest extends TestCase
             ->where('queue', ['verifying' => 2, 'unpaid' => 1, 'overdue' => 1]));
     }
 
-    public function test_charts_have_twelve_months_and_thirty_days_and_top_products_rank_by_orders(): void
+    public function test_monthly_hpp_counts_only_delivered_accounts_without_estimates(): void
+    {
+        $this->sale(['total' => 49000], 12000);
+        $this->sale(['total' => 60000, 'paid_at' => now()->subMonth()->startOfMonth()->addDays(3)], 7000);
+        // Kiriman bulan ke-2 belum terkirim: masuk estimasi HPP untuk laba, tapi bukan batang HPP.
+        $pending = $this->sale(['total' => 30000], 5000);
+        $pending->deliveries()->create(['sequence' => 2, 'due_on' => today()->addMonth()->toDateString()]);
+
+        $this->get('/dashboard')->assertInertia(fn ($page) => $page
+            ->where('finance.hpp_actual', 17000));
+
+        $points = fn (string $q) => collect($this->get('/dashboard'.$q)->viewData('page')['props']['chart']['points']);
+        $this->assertSame(17000, $points('')->sum('hpp'));
+        $this->assertSame(7000, $points('?periode=bulan-lalu')->sum('hpp'));
+        $this->assertSame(24000, $points('?periode=semua')->sum('hpp'));
+    }
+
+    public function test_chart_follows_the_period_filter_per_day_or_per_month(): void
+    {
+        $this->sale(['total' => 49000], 12000);
+
+        $chart = fn (string $q) => $this->get('/dashboard'.$q)->viewData('page')['props']['chart'];
+
+        $week = $chart('?periode=7-hari');
+        $this->assertSame('day', $week['unit']);
+        $this->assertCount(7, $week['points']);
+        $this->assertSame(49000, $week['points'][6]['revenue']);
+        $this->assertSame(12000, $week['points'][6]['hpp']);
+
+        $this->assertCount(30, $chart('?periode=30-hari')['points']);
+        $this->assertSame(now()->subMonth()->daysInMonth, count($chart('?periode=bulan-lalu')['points']));
+
+        $year = $chart('?periode=tahun-ini');
+        $this->assertSame('month', $year['unit']);
+        $this->assertCount(now()->month, $year['points']);
+
+        $all = $chart('?periode=semua');
+        $this->assertSame('month', $all['unit']);
+        $this->assertSame(49000, collect($all['points'])->sum('revenue'));
+    }
+
+    public function test_charts_default_to_this_month_by_day_and_thirty_days_and_top_products_rank_by_orders(): void
     {
         $this->sale(['total' => 70000]);
         $this->sale(['total' => 30000]);
@@ -122,7 +163,7 @@ class DashboardFinanceTest extends TestCase
         $this->sale(['product_id' => $other->id, 'product_name' => 'Spotify Premium', 'total' => 90000]);
 
         $this->get('/dashboard')->assertInertia(fn ($page) => $page
-            ->has('monthly', 12)->where('monthly.11.revenue', 190000)->where('monthly.10.revenue', 0)
+            ->where('chart.unit', 'day')->where('chart.points.'.(now()->day - 1).'.revenue', 190000)->has('chart.points', now()->day)
             ->has('daily', 30)->where('daily.29.paid', 3)->where('daily.29.created', 3)
             ->where('top_products.0', ['name' => 'Netflix Premium', 'orders' => 2, 'revenue' => 100000])
             ->where('top_products.1.name', 'Spotify Premium')
@@ -132,6 +173,6 @@ class DashboardFinanceTest extends TestCase
     public function test_an_empty_store_shows_zeroes_without_errors(): void
     {
         $this->get('/dashboard?periode=semua')->assertOk()->assertInertia(fn ($page) => $page
-            ->where('finance.revenue', 0)->where('finance.total_profit', 0)->where('top_products', [])->has('monthly', 12));
+            ->where('finance.revenue', 0)->where('finance.total_profit', 0)->where('top_products', [])->where('chart.unit', 'month')->has('chart.points', 1));
     }
 }

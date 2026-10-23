@@ -3,10 +3,10 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Enums\AccountType;
-use App\Enums\ProductCategory;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\ProductRequest;
 use App\Models\Product;
+use App\Models\ProductCategory;
 use App\Models\ProductVariant;
 use App\Models\ServiceFee;
 use App\Models\Warranty;
@@ -25,38 +25,40 @@ class ProductController extends Controller
     public function index(Request $request): Response
     {
         $q = trim((string) $request->query('q'));
-        $category = ProductCategory::tryFrom((string) $request->query('category'));
+        $category = ProductCategory::where('slug', (string) $request->query('category'))->first();
         $status = in_array($request->query('status'), ['active', 'inactive'], true) ? $request->query('status') : null;
 
         $products = Product::query()
-            ->with('productVariants.variant')
+            ->with('productVariants.variant', 'category')
+            ->withStockCount()
             ->search($q)
-            ->when($category, fn ($query) => $query->where('category', $category))
+            ->when($category, fn ($query) => $query->where('category_id', $category->id))
             ->when($status, fn ($query) => $query->where('is_active', $status === 'active'))
             ->orderBy('sort_order')
             ->orderBy('name')
-            ->paginate(10)
-            ->withQueryString()
-            ->through(fn (Product $p) => [
+            ->get()
+            ->map(fn (Product $p) => [
                 'id' => $p->id,
                 'name' => $p->name,
                 'slug' => $p->slug,
-                'category' => $p->category->value,
-                'category_label' => $p->category->label(),
+                'category' => $p->category->slug,
+                'category_label' => $p->category->name,
                 'image_url' => $p->image_url,
                 'is_active' => $p->is_active,
                 'price' => $p->price,
                 'discount_percent' => $p->discount_percent,
                 'final_price' => $p->final_price,
                 'variants_count' => $p->productVariants->count(),
+                'stock_count' => (int) $p->stock_count,
                 'price_min' => $p->offers()->min('final_price'),
                 'price_max' => $p->offers()->max('final_price'),
-            ]);
+            ])
+            ->values();
 
         return Inertia::render('Products/Index', [
             'products' => $products,
-            'filters' => ['q' => $q, 'category' => $category?->value ?? '', 'status' => $status ?? ''],
-            'categories' => ProductCategory::options(),
+            'filters' => ['q' => $q, 'category' => $category?->slug ?? '', 'status' => $status ?? ''],
+            'categories' => $this->categoryOptions(),
         ]);
     }
 
@@ -88,7 +90,7 @@ class ProductController extends Controller
                 'id' => $product->id,
                 'name' => $product->name,
                 'slug' => $product->slug,
-                'category' => $product->category->value,
+                'category' => $product->category->slug,
                 'account_type' => $product->account_type?->value ?? '',
                 'description' => $product->description ?? '',
                 'highlights' => $product->highlights ?? [],
@@ -179,7 +181,12 @@ class ProductController extends Controller
     /** @return array<string, mixed> */
     private function attributes(ProductRequest $request, ?Product $product = null): array
     {
-        $data = $request->safe()->except(['image', 'remove_image']);
+        $data = $request->safe()->except(['image', 'remove_image', 'category', 'new_category']);
+
+        $category = $request->filled('new_category')
+            ? ProductCategory::findOrCreateByName($request->string('new_category')->toString())
+            : ProductCategory::where('slug', $request->string('category')->toString())->firstOrFail();
+        $data['category_id'] = $category->id;
 
         $data['slug'] = $data['slug'] ?: ($product?->slug ?? Product::uniqueSlug($data['name']));
         $data['sort_order'] = $data['sort_order'] ?? 0;
@@ -197,11 +204,17 @@ class ProductController extends Controller
         }
     }
 
+    /** @return list<array{value: string, label: string}> */
+    private function categoryOptions(): array
+    {
+        return ProductCategory::orderBy('id')->get()->map(fn (ProductCategory $c) => ['value' => $c->slug, 'label' => $c->name])->all();
+    }
+
     /** @return array<string, mixed> */
     private function options(): array
     {
         return [
-            'categories' => ProductCategory::options(),
+            'categories' => $this->categoryOptions(),
             'account_types' => AccountType::options(),
             'service_fee' => ServiceFee::current(),
         ];

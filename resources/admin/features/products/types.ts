@@ -32,6 +32,8 @@ export type ProductForm = {
   name: string
   slug: string
   category: string
+  /** Nama kategori baru; dibuat otomatis saat produk disimpan (kosong bila memilih yang sudah ada). */
+  new_category: string
   account_type: string
   description: string
   highlights: string[]
@@ -47,7 +49,7 @@ export type ProductForm = {
   remove_image: boolean
 }
 
-export type EditableProduct = Omit<ProductForm, 'image' | 'remove_image'> & {
+export type EditableProduct = Omit<ProductForm, 'image' | 'remove_image' | 'new_category'> & {
   id: number
   image_url: string | null
   /** Ukuran asli/hasil dan tombol per gambar (lihat ImageOptimizeInfo). */

@@ -7,6 +7,14 @@ return [
     // Nomor WhatsApp admin (08xx atau 628xx). Dipakai tautan WhatsApp di seluruh toko dan widget chat.
     'whatsapp' => env('ADMIN_WHATSAPP_NUMBER'),
 
+    // Teks pembuka chat WhatsApp (bisa diubah admin di Pengaturan). Penanda: {toko}, {produk}, {link} (hanya jenis "product").
+    'whatsapp_messages' => [
+        'product' => 'Halo {toko}, saya mau tanya produk {produk}.',
+        'general' => 'Halo {toko}, saya mau tanya tentang produk.',
+        'max_length' => 300,
+        'placeholders' => ['product' => ['toko', 'produk', 'link'], 'general' => ['toko']],
+    ],
+
     // Masa aktif bawaan akun baru (hari). Bisa diubah per akun saat input.
     'account_days' => 28,
 

@@ -45,30 +45,32 @@ type ProductRow = {
   discount_percent: number
   final_price: number
   variants_count: number
+  stock_count: number
   price_min: number | null
   price_max: number | null
-}
-
-type Paginated<T> = {
-  data: T[]
-  current_page: number
-  last_page: number
-  total: number
-  from: number | null
-  to: number | null
-  prev_page_url: string | null
-  next_page_url: string | null
 }
 
 type Filters = { q: string; category: string; status: string }
 
 type Props = {
-  products: Paginated<ProductRow>
+  products: ProductRow[]
   filters: Filters
   categories: Option[]
 }
 
 const ALL = 'all'
+/** Sama dengan toko: stok di bawah atau sama dengan angka ini ditandai menipis. */
+const LOW_STOCK = 5
+
+function StockBadge({ count }: { count: number }) {
+  if (count === 0) return <Badge variant='destructive'>Habis</Badge>
+  return (
+    <span className={count <= LOW_STOCK ? 'text-sm font-semibold text-amber-600' : 'text-sm font-medium'}>
+      {count} akun
+    </span>
+  )
+}
+
 const URL = '/admin/produk'
 
 export default function Index({ products, filters, categories }: Props) {
@@ -156,19 +158,20 @@ export default function Index({ products, filters, categories }: Props) {
                 <TableHead className='hidden md:table-cell'>Kategori</TableHead>
                 <TableHead className='hidden lg:table-cell'>Harga produk</TableHead>
                 <TableHead className='hidden sm:table-cell'>Varian &amp; harga</TableHead>
+                <TableHead>Stok</TableHead>
                 <TableHead>Aktif</TableHead>
                 <TableHead className='w-12'><span className='sr-only'>Aksi</span></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {products.data.length === 0 && (
+              {products.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className='h-32 text-center text-muted-foreground'>
+                  <TableCell colSpan={7} className='h-32 text-center text-muted-foreground'>
                     {hasFilters ? 'Tidak ada produk yang cocok dengan pencarian.' : 'Belum ada produk. Klik "Tambah Produk" untuk memulai.'}
                   </TableCell>
                 </TableRow>
               )}
-              {products.data.map((product) => (
+              {products.map((product) => (
                 <TableRow key={product.id}>
                   <TableCell>
                     <div className='flex items-center gap-3'>
@@ -208,6 +211,9 @@ export default function Index({ products, filters, categories }: Props) {
                           : `${formatRupiah(product.price_min)} - ${formatRupiah(product.price_max ?? 0)}`}
                     </p>
                     <p className='text-xs text-muted-foreground'>{product.variants_count} varian</p>
+                  </TableCell>
+                  <TableCell>
+                    <StockBadge count={product.stock_count} />
                   </TableCell>
                   <TableCell>
                     <Switch
@@ -252,18 +258,8 @@ export default function Index({ products, filters, categories }: Props) {
 
         <div className='mt-4 flex flex-wrap items-center justify-between gap-2'>
           <p className='text-sm text-muted-foreground'>
-            {products.total > 0
-              ? `Menampilkan ${products.from}-${products.to} dari ${products.total} produk`
-              : 'Tidak ada produk'}
+            {products.length > 0 ? `Menampilkan ${products.length} produk` : 'Tidak ada produk'}
           </p>
-          <div className='flex gap-2'>
-            <Button variant='outline' size='sm' asChild={Boolean(products.prev_page_url)} disabled={!products.prev_page_url}>
-              {products.prev_page_url ? <Link href={products.prev_page_url} preserveScroll>Sebelumnya</Link> : <span>Sebelumnya</span>}
-            </Button>
-            <Button variant='outline' size='sm' asChild={Boolean(products.next_page_url)} disabled={!products.next_page_url}>
-              {products.next_page_url ? <Link href={products.next_page_url} preserveScroll>Berikutnya</Link> : <span>Berikutnya</span>}
-            </Button>
-          </div>
         </div>
       </Main>
 

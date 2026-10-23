@@ -5,13 +5,13 @@ namespace App\Models;
 use App\Support\VersionedUrl;
 use App\Enums\AccountStatus;
 use App\Enums\AccountType;
-use App\Enums\ProductCategory;
 use Database\Factories\ProductFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 #[Fillable([
-    'name', 'slug', 'category', 'account_type', 'description', 'highlights', 'specs',
+    'name', 'slug', 'category_id', 'account_type', 'description', 'highlights', 'specs',
     'price', 'discount_percent', 'service_fee', 'image', 'meta_title', 'meta_description', 'sort_order', 'is_active',
 ])]
 class Product extends Model
@@ -31,7 +31,6 @@ class Product extends Model
     protected function casts(): array
     {
         return [
-            'category' => ProductCategory::class,
             'account_type' => AccountType::class,
             'highlights' => 'array',
             'specs' => 'array',
@@ -41,6 +40,11 @@ class Product extends Model
             'is_active' => 'boolean',
             'sort_order' => 'integer',
         ];
+    }
+
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(ProductCategory::class, 'category_id');
     }
 
     public function warranties(): BelongsToMany
@@ -98,11 +102,16 @@ class Product extends Model
         return $query->where('is_active', true);
     }
 
+    /** Menambah `stock_count`: jumlah akun tersedia (stok). */
+    public function scopeWithStockCount(Builder $query): Builder
+    {
+        return $query->withCount(['accounts as stock_count' => fn (Builder $q) => $q->where('status', AccountStatus::Available)]);
+    }
+
     /** Menambah `stock_count` (akun tersedia) dan `sold_count` (akun terjual) untuk tampilan toko. */
     public function scopeWithStoreCounts(Builder $query): Builder
     {
-        return $query->withCount([
-            'accounts as stock_count' => fn (Builder $q) => $q->where('status', AccountStatus::Available),
+        return $query->withStockCount()->withCount([
             'accounts as sold_count' => fn (Builder $q) => $q->where('status', AccountStatus::Sold),
         ]);
     }

@@ -12,6 +12,7 @@ use App\Http\Controllers\Admin\DeployGuideController;
 use App\Http\Controllers\Admin\FaqController;
 use App\Http\Controllers\Admin\LegalPageController;
 use App\Http\Controllers\Admin\OrderController;
+use App\Http\Controllers\Admin\ProductCategoryController;
 use App\Http\Controllers\Admin\ProductController;
 use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\ReviewController;
@@ -42,6 +43,8 @@ Route::prefix('admin')->name('admin.')->group(function () {
     Route::patch('produk/{product}/aktif', [ProductController::class, 'toggle'])->name('products.toggle');
     Route::patch('produk/{product}/gambar', [ProductController::class, 'image'])->name('products.image');
     Route::delete('produk/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
+    // Kategori dibuat otomatis dari form produk; di sini hanya ganti nama (slug dikunci).
+    Route::patch('kategori-produk/{category:slug}', [ProductCategoryController::class, 'update'])->name('product-categories.update');
 
     // Varian: templat durasi, dipasang ke produk dengan harga per produk.
     Route::get('varian', [VariantController::class, 'index'])->name('variants.index');
@@ -117,6 +120,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
     Route::get('pengaturan', [SettingController::class, 'index'])->name('settings.index');
     Route::put('pengaturan/notifikasi', [SettingController::class, 'updateNotifications'])->name('settings.notifications');
     Route::put('pengaturan/chat', [SettingController::class, 'updateChat'])->name('settings.chat');
+    Route::put('pengaturan/pesan-wa', [SettingController::class, 'updateWhatsappMessages'])->name('settings.wa-messages');
     Route::put('pengaturan/pengingat', [SettingController::class, 'updateRenewal'])->name('settings.renewal');
     Route::put('pengaturan/log', [SettingController::class, 'updateLogs'])->name('settings.logs');
     Route::put('pengaturan/gambar', [SettingController::class, 'updateImages'])->name('settings.images');

@@ -46,9 +46,6 @@
                 <p class="text-sm font-semibold text-slate-900">Kontak</p>
                 <ul class="mt-4 space-y-2.5 text-sm text-slate-600">
                     <li><a href="{{ $wa }}" rel="noopener" class="transition hover:text-[#B45309]">WhatsApp admin</a></li>
-                    @if ($store::text('email') !== '')
-                        <li><a href="mailto:{{ $store::text('email') }}" class="transition hover:text-[#B45309]">{{ $store::text('email') }}</a></li>
-                    @endif
                     @foreach (array_filter($socials, fn ($s) => ! $s['managed']) as $social)
                         <li><a href="{{ $social['url'] }}" target="_blank" rel="noopener" class="transition hover:text-[#B45309]">{{ $social['label'] }}</a></li>
                     @endforeach

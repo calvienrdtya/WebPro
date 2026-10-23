@@ -68,3 +68,43 @@ Aturannya:
 - Per gambar di admin: **Pakai file asli** atau **Optimalkan** (form Produk dan Tampilan Toko). Tabel `uploaded_images`.
 - Gambar lama: `php artisan images:optimize` (`--dry-run` untuk melihat daftar). Aman dijalankan ulang.
 - Folder `storage/app/private/image-originals` ikut dicadangkan bersama `public/uploads`.
+
+## Catatan perubahan
+
+### 2026-10-23
+
+- **Kategori produk otomatis dari form produk** (menggantikan enum `ProductCategory`; tidak ada menu CRUD khusus).
+  - Tabel baru `product_categories` (`name`, `slug` unik). `products.category` (string) diganti `products.category_id`.
+    Migrasi `2026_10_26_100000_create_product_categories_table` memindahkan data lama (`ai` = Akun AI, `streaming`, `tools`).
+  - Form produk: dropdown kategori punya opsi **+ Kategori baru** dengan pratinjau nama dan URL. Kategori dibuat saat produk disimpan;
+    nama yang sama (huruf besar/kecil diabaikan) memakai kategori yang sudah ada.
+  - Ikon pensil di samping dropdown untuk **ganti nama**. Slug dikunci agar URL `?kategori=...` yang sudah terindeks tetap hidup.
+  - Toko: filter kategori hanya menampilkan kategori yang punya produk aktif. Kategori kosong disembunyikan, tidak dihapus.
+  - Tidak ada hapus kategori lewat dashboard; baris kategori kosong dibiarkan.
+- **Card produk di toko memakai gambar 16:9** (`aspect-video`, `400x225`) pada layout grid (`components/store/product-card.blade.php`).
+  Gambar utama halaman detail produk (`store/products/show.blade.php`) juga 16:9 (`800x450`). Hanya card `featured` di beranda (thumbnail persegi) yang tidak diubah.
+- **Beranda: bagian "Produk Terlaris" dihapus**, diganti satu bagian per kategori (Akun AI, Streaming, Tools, dan kategori baru),
+  masing-masing hanya berisi produk kategorinya (maks. 8 card, tautan "Lihat semua" ke `/produk?kategori=slug`).
+  Kategori tanpa produk aktif tidak tampil. Bagian "Semua produk" tidak diubah.
+  File: `Store/HomeController.php`, `store/home.blade.php`.
+- **Admin, menu Produk: tanpa paginasi.** Semua produk tampil sekaligus (tetap bisa dicari dan difilter); footer hanya menampilkan jumlah produk.
+- **Dashboard: batang merah HPP** di chart (sekarang 3 batang: Revenue, HPP, Total laba). HPP di batang hanya dari akun yang sudah terkirim (tanpa estimasi); perhitungan Total laba tidak diubah.
+- **Dashboard: chart mengikuti filter periode** (sebelumnya tetap 12 bulan). Bulan ini, bulan lalu, 7 hari, dan 30 hari tampil per hari; tahun ini dan semua tampil per bulan.
+  Logika di `DashboardStats::chart()`; prop Inertia `monthly` diganti `chart` (`unit` + `points`).
+- **Dashboard: chart berubah dari batang ke garis** (3 garis halus: Revenue, HPP merah, Total laba hijau). Hanya tampilan di
+  `resources/admin/features/dashboard/components/overview.tsx`; data, filter, tooltip, dan legend tidak berubah. Titik data digambar
+  bila titiknya 12 atau kurang (7 hari, bulanan), selebihnya muncul saat di-hover. Animasi dimatikan agar pindah filter terasa ringan.
+- **Admin, menu Produk: kolom Stok** (jumlah akun berstatus tersedia per produk; "Habis" bila 0, oranye bila 5 atau kurang, sama dengan batas di toko). Scope baru `Product::withStockCount()`.
+- **Card produk (layout grid):** badge "akun terjual" di atas judul diganti badge diskon (di sebelah badge stok, hanya bila ada diskon); di baris bawah ada ikon WhatsApp kecil di kiri (link `wa.me`
+  dengan pesan "Halo ProAkses, saya mau tanya {produk}", buka tab baru) dan tombol Beli di kanan. Ikon disembunyikan bila nomor WhatsApp admin belum diisi.
+  Card `featured` di beranda tidak diubah. File: `components/store/product-card.blade.php`.
+- **Footer toko:** email dihapus dari kolom Kontak (tersisa WhatsApp admin dan media sosial). Isian email di Tampilan Toko tidak dihapus. File: `store/partials/footer.blade.php`.
+- **Pengaturan: teks pembuka chat WhatsApp.** Di menu Pengaturan admin, dua teks yang bisa diubah: tombol WhatsApp di produk (card dan halaman detail) dan pop up WhatsApp.
+  Penanda `{toko}`, `{produk}`, `{link}` (untuk teks produk) diisi otomatis, mis. produk Netflix membuka chat "Halo ProAkses, saya mau tanya produk Netflix Premium.".
+  Penanda tak dikenal atau teks lebih dari 300 huruf ditolak; kosong atau sama dengan bawaan = pakai bawaan (`config/proakses.php` → `whatsapp_messages`).
+  Disimpan di tabel `settings` (kunci `chat.wa_message.product|general`), tanpa migrasi. Logika di `App\Support\Whatsapp` (`template`, `productMessage`, `generalMessage`).
+
+**Saat deploy perubahan ini ke production:**
+1. Backup database dulu (menu admin Backup).
+2. Unggah kode, lalu `php artisan migrate` (menghapus kolom `products.category`; ada `down()` untuk mundur).
+3. `npm run build` lalu unggah `public/build` (perlu karena halaman admin Produk berubah).

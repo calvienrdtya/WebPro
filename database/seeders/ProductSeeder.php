@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Enums\PriceMode;
 use App\Models\Product;
+use App\Models\ProductCategory;
 use App\Models\Variant;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Storage;
@@ -32,7 +33,7 @@ class ProductSeeder extends Seeder
 
             $product->fill([
                 'name' => $item['name'],
-                'category' => $item['category'],
+                'category_id' => $this->category($item['category'])->id,
                 'account_type' => $item['account_type'],
                 'description' => $item['description'],
                 'highlights' => $item['highlights'],
@@ -64,6 +65,13 @@ class ProductSeeder extends Seeder
                 ]);
             }
         }
+    }
+
+    private function category(string $slug): ProductCategory
+    {
+        $names = ['ai' => 'Akun AI', 'streaming' => 'Streaming', 'tools' => 'Tools'];
+
+        return ProductCategory::firstOrCreate(['slug' => $slug], ['name' => $names[$slug] ?? ucfirst($slug)]);
     }
 
     private function storeImage(string $slug, string $file): string

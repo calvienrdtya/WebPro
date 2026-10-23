@@ -9,6 +9,7 @@ use App\Models\Order;
 use App\Models\OrderDelivery;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -80,6 +81,7 @@ class DashboardStats
             'orders' => (int) $sums->orders,
             'revenue' => $revenue,
             'hpp' => $hpp,
+            'hpp_actual' => $hppActual,
             'hpp_estimate' => $hppEstimate,
             'profit' => $profit,
             'fee' => (int) $sums->fee,
@@ -99,34 +101,92 @@ class DashboardStats
             ->selectRaw('orders.product_id, count(*) as total')
             ->pluck('total', 'product_id');
 
-        if ($pending->isEmpty()) {
-            return 0;
-        }
+        $averages = $this->averageCogs($pending->keys());
 
-        $stockAvg = Account::query()->where('status', AccountStatus::Available->value)->whereIn('product_id', $pending->keys())
-            ->whereNotNull('cogs')->groupBy('product_id')->selectRaw('product_id, avg(cogs) as avg_cogs')->pluck('avg_cogs', 'product_id');
-        $historyAvg = OrderDelivery::query()->join('orders', 'orders.id', '=', 'order_deliveries.order_id')
-            ->whereIn('orders.product_id', $pending->keys())->whereNotNull('order_deliveries.cogs')
-            ->groupBy('orders.product_id')->selectRaw('orders.product_id, avg(order_deliveries.cogs) as avg_cogs')->pluck('avg_cogs', 'product_id');
-
-        return (int) round($pending->sum(fn ($count, $productId) => $count * (float) ($stockAvg[$productId] ?? $historyAvg[$productId] ?? 0)));
+        return (int) round($pending->sum(fn ($count, $productId) => $count * ($averages[$productId] ?? 0.0)));
     }
 
     /**
-     * Revenue dan total laba per bulan untuk 12 bulan terakhir (bulan ini paling kanan).
+     * Rata-rata HPP per produk untuk estimasi: stok tersedia dulu, cadangan rata-rata HPP kiriman produk itu.
      *
-     * @return list<array{month: string, label: string, revenue: int, profit: int}>
+     * @param  Collection<int, int>  $productIds
+     * @return array<int, float>
      */
-    public function monthly(int $months = 12): array
+    private function averageCogs(Collection $productIds): array
     {
-        $now = CarbonImmutable::now()->startOfMonth();
+        if ($productIds->isEmpty()) {
+            return [];
+        }
 
-        return collect(range($months - 1, 0))->map(function (int $ago) use ($now) {
-            $start = $now->subMonthsNoOverflow($ago);
-            $f = $this->finance($start, $start->endOfMonth());
+        $stockAvg = Account::query()->where('status', AccountStatus::Available->value)->whereIn('product_id', $productIds)
+            ->whereNotNull('cogs')->groupBy('product_id')->selectRaw('product_id, avg(cogs) as avg_cogs')->pluck('avg_cogs', 'product_id');
+        $historyAvg = OrderDelivery::query()->join('orders', 'orders.id', '=', 'order_deliveries.order_id')
+            ->whereIn('orders.product_id', $productIds)->whereNotNull('order_deliveries.cogs')
+            ->groupBy('orders.product_id')->selectRaw('orders.product_id, avg(order_deliveries.cogs) as avg_cogs')->pluck('avg_cogs', 'product_id');
 
-            return ['month' => $start->format('Y-m'), 'label' => $start->translatedFormat('M'), 'revenue' => $f['revenue'], 'profit' => $f['total_profit']];
-        })->all();
+        return $productIds->mapWithKeys(fn ($id) => [$id => (float) ($stockAvg[$id] ?? $historyAvg[$id] ?? 0)])->all();
+    }
+
+    /**
+     * Revenue, HPP, dan total laba untuk grafik, mengikuti periode yang dipilih: per hari untuk rentang pendek
+     * (bulan ini, bulan lalu, 7 hari, 30 hari), per bulan untuk tahun ini dan semua waktu.
+     *
+     * HPP di batang hanya akun yang sudah terkirim (tanpa estimasi), dikelompokkan pada tanggal bayar pesanannya seperti kartu.
+     * Total laba = revenue - HPP termasuk estimasi kiriman yang belum terkirim, jadi bisa lebih kecil dari revenue - batang HPP.
+     *
+     * @return array{unit: string, points: list<array{key: string, label: string, revenue: int, hpp: int, profit: int}>}
+     */
+    public function chart(?CarbonImmutable $from, ?CarbonImmutable $to): array
+    {
+        $orders = $this->paidOrders($from, $to)->get(['id', 'paid_at', 'total', 'product_id']);
+        $now = CarbonImmutable::now();
+
+        $start = $from ?? ($orders->isEmpty() ? $now->startOfMonth() : CarbonImmutable::instance($orders->min('paid_at'))->startOfMonth());
+        $end = $to ?? $now;
+        $unit = $from && $start->diffInDays($end) <= 62 ? 'day' : 'month';
+        $key = fn (CarbonImmutable $d) => $unit === 'day' ? $d->toDateString() : $d->format('Y-m');
+
+        $keyOf = $orders->mapWithKeys(fn (Order $o) => [$o->id => $key(CarbonImmutable::instance($o->paid_at))]);
+
+        $revenue = [];
+        foreach ($orders as $order) {
+            $revenue[$keyOf[$order->id]] = ($revenue[$keyOf[$order->id]] ?? 0) + (int) $order->total;
+        }
+
+        $actual = [];
+        $pending = [];
+        $deliveries = OrderDelivery::whereIn('order_id', $this->paidOrders($from, $to)->select('id'))->get(['order_id', 'cogs', 'delivered_at']);
+        $productOf = $orders->pluck('product_id', 'id');
+        foreach ($deliveries as $delivery) {
+            $k = $keyOf[$delivery->order_id];
+            if ($delivery->delivered_at) {
+                $actual[$k] = ($actual[$k] ?? 0) + (int) $delivery->cogs;
+            } else {
+                $pending[$k][$productOf[$delivery->order_id]] = ($pending[$k][$productOf[$delivery->order_id]] ?? 0) + 1;
+            }
+        }
+
+        $averages = $this->averageCogs(collect($pending)->flatMap(fn ($byProduct) => array_keys($byProduct))->unique()->values());
+
+        $step = $unit === 'day' ? $start->startOfDay() : $start->startOfMonth();
+        $multiYear = $unit === 'month' && $start->diffInMonths($end) >= 12;
+        $points = [];
+
+        for ($d = $step; $d <= $end; $d = $unit === 'day' ? $d->addDay() : $d->addMonthNoOverflow()) {
+            $k = $key($d);
+            $estimate = (int) round(collect($pending[$k] ?? [])->sum(fn ($count, $productId) => $count * ($averages[$productId] ?? 0.0)));
+            $rev = $revenue[$k] ?? 0;
+
+            $points[] = [
+                'key' => $k,
+                'label' => $unit === 'day' ? $d->translatedFormat('j M') : $d->translatedFormat($multiYear ? 'M y' : 'M'),
+                'revenue' => $rev,
+                'hpp' => $actual[$k] ?? 0,
+                'profit' => $rev - ($actual[$k] ?? 0) - $estimate,
+            ];
+        }
+
+        return ['unit' => $unit, 'points' => $points];
     }
 
     /**

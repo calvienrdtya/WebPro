@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
+import { Textarea } from '@/components/ui/textarea'
 import { AdminHeader } from '@/components/layout/admin-header'
 import { Main } from '@/components/layout/main'
 import { FieldError } from '@/features/products/field-error'
@@ -13,7 +14,18 @@ import { FieldError } from '@/features/products/field-error'
 type Props = {
   notifications: { email_enabled: boolean; email_to: string; types: { type: string; label: string; enabled: boolean }[] }
   qris: { url: string; custom: boolean }
-  chat: { ai: boolean; wa: boolean; number: string | null }
+  chat: {
+    ai: boolean
+    wa: boolean
+    number: string | null
+    messages: {
+      product: string
+      general: string
+      max_length: number
+      defaults: { product: string; general: string }
+      placeholders: { product: string[]; general: string[] }
+    }
+  }
   renewal: { enabled: boolean; days: number; min_days: number; max_days: number }
   logs: { system_days: number; activity_days: number; min_days: number; max_system_days: number; max_activity_days: number }
   images: { quality: number; min: number; max: number; webp: boolean }
@@ -30,6 +42,12 @@ export default function Index({ notifications, qris, chat, renewal, logs, images
   const submit = (e: FormEvent) => {
     e.preventDefault()
     form.put('/admin/pengaturan/notifikasi', { preserveScroll: true })
+  }
+
+  const messagesForm = useForm({ product: chat.messages.product, general: chat.messages.general })
+  const submitMessages = (e: FormEvent) => {
+    e.preventDefault()
+    messagesForm.put('/admin/pengaturan/pesan-wa', { preserveScroll: true })
   }
 
   // Saklar pop up chat langsung tersimpan saat digeser (untuk mematikan cepat saat ada perbaikan atau deploy).
@@ -297,6 +315,44 @@ export default function Index({ notifications, qris, chat, renewal, logs, images
             )}
           </div>
         </section>
+
+        <form onSubmit={submitMessages} noValidate className='mt-6 max-w-2xl space-y-4 rounded-lg border p-4'>
+          <div>
+            <h2 className='font-semibold'>Teks pembuka chat WhatsApp</h2>
+            <p className='text-sm text-muted-foreground'>
+              Teks yang sudah terisi saat pelanggan membuka chat WhatsApp admin. Pelanggan masih bisa mengubahnya sebelum mengirim.
+            </p>
+          </div>
+          {(['product', 'general'] as const).map((type) => (
+            <div key={type} className='space-y-2'>
+              <Label htmlFor={`wa_message_${type}`}>
+                {type === 'product' ? 'Tombol WhatsApp di produk' : 'Pop up WhatsApp'}
+              </Label>
+              <Textarea
+                id={`wa_message_${type}`}
+                rows={2}
+                maxLength={chat.messages.max_length}
+                value={messagesForm.data[type]}
+                onChange={(e) => messagesForm.setData(type, e.target.value)}
+              />
+              <p className='text-xs text-muted-foreground'>
+                Penanda: {chat.messages.placeholders[type].map((p) => `{${p}}`).join(', ')}.
+                {type === 'product' ? ' Contoh: untuk Netflix, {produk} menjadi "Netflix Premium".' : ''}{' '}
+                <button
+                  type='button'
+                  className='underline'
+                  onClick={() => messagesForm.setData(type, chat.messages.defaults[type])}
+                >
+                  Pakai teks bawaan
+                </button>
+              </p>
+              <FieldError message={messagesForm.errors[type]} />
+            </div>
+          ))}
+          <Button type='submit' disabled={messagesForm.processing}>
+            {messagesForm.processing ? 'Menyimpan...' : 'Simpan'}
+          </Button>
+        </form>
 
         <form onSubmit={submitQris} noValidate className='mt-6 max-w-2xl space-y-4 rounded-lg border p-4'>
           <div>

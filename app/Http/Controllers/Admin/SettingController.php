@@ -6,11 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\NotificationSettingsRequest;
 use App\Models\Setting;
 use App\Services\AdminNotifier;
+use App\Services\Ai\PromptBuilder;
 use App\Support\ImageOptimizer;
 use App\Support\Whatsapp;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -28,6 +30,13 @@ class SettingController extends Controller
                 'ai' => Whatsapp::aiPopupEnabled(),
                 'wa' => Setting::bool(Setting::CHAT_WA_ENABLED, true),
                 'number' => Whatsapp::number(),
+                'messages' => [
+                    'product' => Whatsapp::template('product'),
+                    'general' => Whatsapp::template('general'),
+                    'max_length' => (int) config('proakses.whatsapp_messages.max_length'),
+                    'defaults' => ['product' => config('proakses.whatsapp_messages.product'), 'general' => config('proakses.whatsapp_messages.general')],
+                    'placeholders' => config('proakses.whatsapp_messages.placeholders'),
+                ],
             ],
             'renewal' => [
                 'enabled' => Setting::renewalEnabled(),
@@ -124,6 +133,42 @@ class SettingController extends Controller
         }
 
         return back()->with('success', implode(' ', $messages) ?: 'Tidak ada perubahan.');
+    }
+
+    /**
+     * Teks pembuka chat WhatsApp: untuk tombol WhatsApp di produk dan untuk pop up WhatsApp. Kosong = kembali ke bawaan.
+     * Penanda yang tidak dikenal ditolak supaya salah ketik (mis. {prodak}) tidak terkirim apa adanya ke pelanggan.
+     */
+    public function updateWhatsappMessages(Request $request): RedirectResponse
+    {
+        $config = config('proakses.whatsapp_messages');
+        $labels = ['product' => 'Pesan tombol WhatsApp produk', 'general' => 'Pesan pop up WhatsApp'];
+
+        $data = $request->validate([
+            'product' => ['nullable', 'string', 'max:'.$config['max_length']],
+            'general' => ['nullable', 'string', 'max:'.$config['max_length']],
+        ], [], $labels);
+
+        $texts = array_map(fn ($type) => trim((string) ($data[$type] ?? '')), array_combine(array_keys($labels), array_keys($labels)));
+        $errors = [];
+
+        foreach ($texts as $type => $text) {
+            $unknown = array_diff(PromptBuilder::placeholders($text), $config['placeholders'][$type]);
+
+            if ($unknown !== []) {
+                $errors[$type] = $labels[$type].' memuat penanda yang tidak dikenal: {'.implode('}, {', $unknown).'}. Yang tersedia: {'.implode('}, {', $config['placeholders'][$type]).'}.';
+            }
+        }
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
+
+        foreach ($texts as $type => $text) {
+            Setting::put(Setting::WA_MESSAGE_PREFIX.$type, $text === $config[$type] ? '' : $text);
+        }
+
+        return back()->with('success', 'Teks pembuka chat WhatsApp disimpan.');
     }
 
     /** Gambar QRIS yang ditampilkan di halaman bayar. Tanpa unggahan, dipakai gambar bawaan. */

@@ -2,7 +2,10 @@
 
 namespace Tests\Feature\Admin;
 
+use App\Enums\AccountStatus;
+use App\Models\Account;
 use App\Models\Product;
+use App\Models\ProductCategory;
 use App\Models\ProductVariant;
 use App\Models\User;
 use App\Models\Variant;
@@ -21,6 +24,11 @@ class ProductAdminTest extends TestCase
         Storage::fake('uploads');
         Storage::fake('local'); // file asli gambar (ImageOptimizer)
         $this->actingAs(User::factory()->create(['is_admin' => true]));
+    }
+
+    private function category(string $slug, string $name): ProductCategory
+    {
+        return ProductCategory::firstOrCreate(['slug' => $slug], ['name' => $name]);
     }
 
     private function payload(array $overrides = []): array
@@ -80,7 +88,7 @@ class ProductAdminTest extends TestCase
 
     // ---------- daftar ----------
 
-    public function test_index_lists_products_ordered_with_price_range_and_pagination(): void
+    public function test_index_lists_all_products_ordered_with_price_range_without_pagination(): void
     {
         $b = $this->productWithVariants(['name' => 'Bravo', 'sort_order' => 2], 3);
         $a = $this->productWithVariants(['name' => 'Alpha', 'sort_order' => 2]);
@@ -91,27 +99,36 @@ class ProductAdminTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('Products/Index')
-                ->where('products.total', 13)
-                ->where('products.per_page', 10)
-                ->has('products.data', 10)
-                ->where('products.data.0.name', 'Zulu')
-                ->where('products.data.1.name', 'Alpha')
-                ->where('products.data.2.name', 'Bravo')
-                ->where('products.data.2.variants_count', 3)
-                ->where('products.data.2.price_min', 10000)
-                ->where('products.data.2.price_max', 30000)
+                ->has('products', 13)
+                ->where('products.0.name', 'Zulu')
+                ->where('products.1.name', 'Alpha')
+                ->where('products.2.name', 'Bravo')
+                ->where('products.2.variants_count', 3)
+                ->where('products.2.price_min', 10000)
+                ->where('products.2.price_max', 30000)
                 ->has('categories', 3));
+    }
 
-        $this->get('/admin/produk?page=2')->assertInertia(fn ($page) => $page->has('products.data', 3));
+    public function test_index_shows_stock_as_available_accounts_only(): void
+    {
+        $stocked = Product::factory()->create(['name' => 'Ada Stok', 'sort_order' => 1]);
+        $empty = Product::factory()->create(['name' => 'Habis', 'sort_order' => 2]);
+        Account::factory()->count(3)->status(AccountStatus::Available)->create(['product_id' => $stocked->id]);
+        Account::factory()->count(2)->status(AccountStatus::Sold)->create(['product_id' => $stocked->id]);
+        Account::factory()->status(AccountStatus::Sold)->create(['product_id' => $empty->id]);
+
+        $this->get('/admin/produk')->assertInertia(fn ($page) => $page
+            ->where('products.0.stock_count', 3)
+            ->where('products.1.stock_count', 0));
     }
 
     public function test_index_filters_by_search_category_and_status(): void
     {
-        $this->productWithVariants(['name' => 'Spotify Premium', 'slug' => 'spotify-premium', 'category' => 'streaming']);
-        $this->productWithVariants(['name' => 'Canva Pro', 'slug' => 'canva-pro', 'category' => 'tools']);
-        $this->productWithVariants(['name' => 'CapCut Pro', 'slug' => 'capcut-pro', 'category' => 'tools', 'is_active' => false]);
+        $this->productWithVariants(['name' => 'Spotify Premium', 'slug' => 'spotify-premium', 'category_id' => $this->category('streaming', 'Streaming')->id]);
+        $this->productWithVariants(['name' => 'Canva Pro', 'slug' => 'canva-pro', 'category_id' => $this->category('tools', 'Tools')->id]);
+        $this->productWithVariants(['name' => 'CapCut Pro', 'slug' => 'capcut-pro', 'category_id' => $this->category('tools', 'Tools')->id, 'is_active' => false]);
 
-        $names = fn (string $query) => collect($this->get("/admin/produk?$query")->viewData('page')['props']['products']['data'])->pluck('name')->all();
+        $names = fn (string $query) => collect($this->get("/admin/produk?$query")->viewData('page')['props']['products'])->pluck('name')->all();
 
         $this->assertSame(['Spotify Premium'], $names('q=spotify'));
         $this->assertSame(['Canva Pro'], $names('q=canva-pro'));
@@ -139,7 +156,7 @@ class ProductAdminTest extends TestCase
 
         $product = Product::firstOrFail();
         $this->assertSame('netflix-premium', $product->slug);
-        $this->assertSame('streaming', $product->category->value);
+        $this->assertSame('streaming', $product->category->slug);
         $this->assertSame('netflix', $product->account_type->value);
         $this->assertSame(['Kualitas 4K', '1 profil pribadi'], $product->highlights);
         $this->assertSame([['label' => 'Jenis akun', 'value' => 'Sharing']], $product->specs);
@@ -202,7 +219,7 @@ class ProductAdminTest extends TestCase
         $product = Product::factory()->create(['price' => 45000, 'discount_percent' => 20]);
 
         $this->get('/admin/produk')->assertInertia(fn ($page) => $page
-            ->where('products.data.0.price', 45000)->where('products.data.0.discount_percent', 20)->where('products.data.0.final_price', 36000));
+            ->where('products.0.price', 45000)->where('products.0.discount_percent', 20)->where('products.0.final_price', 36000));
         $this->get("/admin/produk/{$product->id}/ubah")->assertInertia(fn ($page) => $page
             ->where('product.price', 45000)->where('product.discount_percent', 20));
     }
@@ -236,6 +253,33 @@ class ProductAdminTest extends TestCase
         $this->assertSame([], $product->highlights);
         $this->assertSame(0, $product->sort_order);
         $this->assertSame(0, $product->discount_percent);
+    }
+
+    public function test_store_with_new_category_creates_it_once_ignoring_case(): void
+    {
+        $this->post('/admin/produk', $this->payload(['category' => '', 'new_category' => 'Musik Premium']))->assertSessionHasNoErrors();
+        $this->post('/admin/produk', $this->payload(['name' => 'Lain', 'category' => '', 'new_category' => 'musik  premium']))->assertSessionHasNoErrors();
+        $this->post('/admin/produk', $this->payload(['name' => 'Tiga', 'category' => '', 'new_category' => 'streaming']))->assertSessionHasNoErrors();
+
+        $category = ProductCategory::where('slug', 'musik-premium')->firstOrFail();
+        $this->assertSame('Musik Premium', $category->name);
+        $this->assertSame(2, $category->products()->count());
+        $this->assertSame(4, ProductCategory::count());
+    }
+
+    public function test_store_requires_a_category(): void
+    {
+        $this->post('/admin/produk', $this->payload(['category' => '', 'new_category' => '']))->assertSessionHasErrors('category');
+    }
+
+    public function test_category_rename_keeps_slug(): void
+    {
+        $this->patch('/admin/kategori-produk/tools', ['name' => 'Alat Kreatif'])->assertSessionHasNoErrors();
+
+        $category = ProductCategory::where('slug', 'tools')->firstOrFail();
+        $this->assertSame('Alat Kreatif', $category->name);
+
+        $this->patch('/admin/kategori-produk/tools', ['name' => 'Streaming'])->assertSessionHasErrors('name');
     }
 
     public function test_store_validation_rules(): void
@@ -369,7 +413,7 @@ class ProductAdminTest extends TestCase
 
         $this->assertSoftDeleted($product);
         $this->assertDatabaseCount('product_variants', 2);
-        $this->get('/admin/produk')->assertInertia(fn ($page) => $page->where('products.total', 0));
+        $this->get('/admin/produk')->assertInertia(fn ($page) => $page->has('products', 0));
         $this->get("/admin/produk/{$product->id}/ubah")->assertNotFound();
         $this->delete("/admin/produk/{$product->id}")->assertNotFound();
     }

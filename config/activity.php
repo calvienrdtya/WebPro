@@ -9,6 +9,7 @@ use App\Models\KnowledgeEntry;
 use App\Models\Order;
 use App\Models\OrderDelivery;
 use App\Models\Product;
+use App\Models\ProductCategory;
 use App\Models\ProductVariant;
 use App\Models\ReportAttachment;
 use App\Models\Review;
@@ -61,6 +62,7 @@ return [
         'admin.products.destroy' => ['products', 'Menghapus produk'],
         'admin.products.toggle' => ['products', 'Mengubah status aktif produk'],
         'admin.products.image' => ['products', 'Mengubah versi gambar produk'],
+        'admin.product-categories.update' => ['products', 'Mengubah nama kategori produk'],
         'admin.variants.store' => ['variants', 'Menambah varian'],
         'admin.variants.update' => ['variants', 'Mengubah varian'],
         'admin.variants.destroy' => ['variants', 'Menghapus varian'],
@@ -151,6 +153,7 @@ return [
         'admin.appearance.campus.image' => ['content', 'Mengubah versi logo kampus'],
         'admin.settings.notifications' => ['settings', 'Mengubah notifikasi admin'],
         'admin.settings.chat' => ['settings', 'Mengubah pop up chat'],
+        'admin.settings.wa-messages' => ['settings', 'Mengubah teks pembuka chat WhatsApp'],
         'admin.settings.renewal' => ['settings', 'Mengubah pengingat perpanjangan'],
         'admin.settings.logs' => ['settings', 'Mengubah masa simpan log'],
         'admin.settings.images' => ['settings', 'Mengubah kualitas gambar'],
@@ -198,6 +201,7 @@ return [
         Order::class => ['Pesanan', 'code'],
         OrderDelivery::class => ['Kiriman akun', 'id'],
         Product::class => ['Produk', 'name'],
+        ProductCategory::class => ['Kategori produk', 'name'],
         ProductVariant::class => ['Varian produk', 'id'],
         ReportAttachment::class => ['Lampiran laporan', 'id'],
         Review::class => ['Ulasan', 'id'],
@@ -218,7 +222,7 @@ return [
         'name' => 'Nama', 'email' => 'Email', 'phone' => 'Nomor WhatsApp', 'password' => 'Sandi', 'pin' => 'PIN',
         'is_admin' => 'Admin', 'blocked_at' => 'Diblokir pada', 'email_verified_at' => 'Email terverifikasi', 'avatar' => 'Foto profil',
         'google_id' => 'Akun Google', 'code' => 'Kode', 'title' => 'Judul', 'description' => 'Deskripsi', 'slug' => 'Slug URL',
-        'category' => 'Kategori', 'account_type' => 'Jenis akun', 'highlights' => 'Keunggulan', 'specs' => 'Spesifikasi',
+        'category' => 'Kategori', 'category_id' => 'Kategori', 'account_type' => 'Jenis akun', 'highlights' => 'Keunggulan', 'specs' => 'Spesifikasi',
         'price' => 'Harga', 'discount_percent' => 'Diskon (%)', 'service_fee' => 'Biaya layanan', 'image' => 'Gambar',
         'meta_title' => 'Judul SEO', 'meta_description' => 'Deskripsi SEO', 'sort_order' => 'Urutan', 'is_active' => 'Aktif',
         'deleted_at' => 'Dihapus pada', 'product_id' => 'Produk', 'variant_id' => 'Varian', 'price_mode' => 'Mode harga',

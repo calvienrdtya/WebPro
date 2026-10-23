@@ -100,6 +100,14 @@ class PromptBuilder
         return preg_replace_callback('/\{([a-z_]+)\}/', fn ($m) => array_key_exists($m[1], $values) ? (string) $values[$m[1]] : $m[0], $template);
     }
 
+    /** @return list<string> nama penanda {xxx} yang dipakai di teks */
+    public static function placeholders(string $text): array
+    {
+        preg_match_all('/\{([a-z_]+)\}/', $text, $m);
+
+        return array_values(array_unique($m[1]));
+    }
+
     /** @return list<string> penanda di template yang tidak dikenal untuk template itu */
     public static function unknownPlaceholders(string $name, string $template): array
     {

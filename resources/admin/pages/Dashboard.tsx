@@ -30,7 +30,7 @@ import {
   trend,
   type DailyPoint,
   type Finance,
-  type MonthlyPoint,
+  type ChartData,
   type StatusCount,
   type TopProduct,
 } from '@/features/dashboard/types'
@@ -40,7 +40,7 @@ type DashboardProps = {
   period: string
   finance: Finance
   previous: Finance | null
-  monthly: MonthlyPoint[]
+  chart: ChartData
   daily: DailyPoint[]
   top_products: TopProduct[]
   by_status: StatusCount[]
@@ -52,7 +52,7 @@ type DashboardProps = {
   }
 }
 
-export default function Dashboard({ period, finance, previous, monthly, daily, top_products, by_status, queue, users }: DashboardProps) {
+export default function Dashboard({ period, finance, previous, chart, daily, top_products, by_status, queue, users }: DashboardProps) {
   const periodLabel = PERIOD_OPTIONS.find((p) => p.value === period)?.label ?? 'Bulan ini'
   const prev = previous ?? undefined
 
@@ -163,11 +163,13 @@ export default function Dashboard({ period, finance, previous, monthly, daily, t
             <div className='grid grid-cols-1 gap-4 lg:grid-cols-7'>
               <Card className='col-span-1 lg:col-span-4'>
                 <CardHeader>
-                  <CardTitle>Revenue dan Total Laba per Bulan</CardTitle>
-                  <CardDescription>12 bulan terakhir. Laba memakai estimasi HPP untuk kiriman yang belum terkirim.</CardDescription>
+                  <CardTitle>Revenue, HPP, dan Total Laba</CardTitle>
+                  <CardDescription>
+                    {periodLabel}, per {chart.unit === 'day' ? 'hari' : 'bulan'}. Batang HPP hanya akun yang sudah terkirim; laba memakai estimasi HPP untuk kiriman yang belum terkirim.
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className='ps-2'>
-                  <Overview data={monthly} />
+                  <Overview data={chart.points} />
                 </CardContent>
               </Card>
               <Card className='col-span-1 lg:col-span-3'>

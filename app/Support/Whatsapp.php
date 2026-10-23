@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\Product;
 use App\Models\Setting;
 use App\Services\Ai\ChatService;
 use App\Services\Ai\PromptBuilder;
@@ -33,6 +34,27 @@ class Whatsapp
         return 'https://wa.me/'.$number.($message ? '?text='.rawurlencode($message) : '');
     }
 
+    /** Template teks pembuka chat jenis `product` atau `general`: pilihan admin, atau bawaan bila kosong. Dibaca sekali per permintaan. */
+    public static function template(string $type): string
+    {
+        return once(fn () => trim((string) Setting::get(Setting::WA_MESSAGE_PREFIX.$type)) ?: config("proakses.whatsapp_messages.{$type}"));
+    }
+
+    /** Teks pembuka chat tentang satu produk, dengan {toko}, {produk}, dan {link} terisi. */
+    public static function productMessage(Product $product): string
+    {
+        return PromptBuilder::fill(static::template('product'), [
+            'toko' => StoreProfile::name(),
+            'produk' => $product->name,
+            'link' => route('products.show', $product->slug),
+        ]);
+    }
+
+    public static function generalMessage(): string
+    {
+        return PromptBuilder::fill(static::template('general'), ['toko' => StoreProfile::name()]);
+    }
+
     /** Pop up Tanya AI tampil bila dinyalakan di Pengaturan (bawaan: nyala). */
     public static function aiPopupEnabled(): bool
     {
@@ -59,7 +81,7 @@ class Whatsapp
             'aiEnabled' => $ai,
             'waEnabled' => $wa,
             'waNumber' => $wa ? static::number() : '',
-            'waMessage' => 'Halo '.StoreProfile::name().', saya mau tanya tentang produk.',
+            'waMessage' => static::generalMessage(),
             'aiEndpoint' => '',
             'assistantName' => AiSettings::behavior()['name'],
         ];

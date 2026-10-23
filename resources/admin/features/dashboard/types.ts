@@ -2,6 +2,7 @@ export type Finance = {
   orders: number
   revenue: number
   hpp: number
+  hpp_actual: number
   hpp_estimate: number
   profit: number
   fee: number
@@ -9,7 +10,9 @@ export type Finance = {
   total_profit: number
 }
 
-export type MonthlyPoint = { month: string; label: string; revenue: number; profit: number }
+export type ChartPoint = { key: string; label: string; revenue: number; hpp: number; profit: number }
+/** Titik grafik mengikuti filter periode: per hari untuk rentang pendek, per bulan untuk tahun ini dan semua. */
+export type ChartData = { unit: 'day' | 'month'; points: ChartPoint[] }
 export type DailyPoint = { date: string; label: string; created: number; paid: number }
 export type TopProduct = { name: string; orders: number; revenue: number }
 export type StatusCount = { status: string; label: string; total: number }

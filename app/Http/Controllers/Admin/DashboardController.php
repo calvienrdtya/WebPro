@@ -27,7 +27,7 @@ class DashboardController extends Controller
             'finance' => $stats->finance($from, $to),
             // Perubahan dibanding periode sebelumnya (persen); null bila periode sebelumnya belum punya data atau periode "semua".
             'previous' => $previous ? $stats->finance(...$previous) : null,
-            'monthly' => $stats->monthly(),
+            'chart' => $stats->chart($from, $to),
             'daily' => $stats->daily(),
             'top_products' => $stats->topProducts($from, $to),
             'by_status' => $stats->byStatus(),

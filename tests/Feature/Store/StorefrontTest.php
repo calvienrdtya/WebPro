@@ -4,9 +4,9 @@ namespace Tests\Feature\Store;
 
 use App\Enums\AccountStatus;
 use App\Enums\PriceMode;
-use App\Enums\ProductCategory;
 use App\Models\Account;
 use App\Models\Product;
+use App\Models\ProductCategory;
 use App\Models\ProductVariant;
 use App\Models\Variant;
 use App\Models\Warranty;
@@ -17,10 +17,15 @@ class StorefrontTest extends TestCase
 {
     use RefreshDatabase;
 
+    private function category(string $slug, string $name): ProductCategory
+    {
+        return ProductCategory::firstOrCreate(['slug' => $slug], ['name' => $name]);
+    }
+
     private function product(array $attrs = []): Product
     {
         return Product::factory()->create(array_merge([
-            'name' => 'Netflix Premium', 'slug' => 'netflix-premium', 'category' => ProductCategory::Streaming,
+            'name' => 'Netflix Premium', 'slug' => 'netflix-premium', 'category_id' => $this->category('streaming', 'Streaming')->id,
             'price' => 65000, 'discount_percent' => 54,
         ], $attrs));
     }
@@ -79,21 +84,12 @@ class StorefrontTest extends TestCase
         $this->get('/')->assertOk()->assertSee('Produk akan tampil di sini');
     }
 
-    public function test_best_sellers_are_ordered_by_sold_accounts(): void
-    {
-        $slow = $this->product(['name' => 'Produk Sepi', 'slug' => 'sepi', 'sort_order' => 1]);
-        $hot = $this->product(['name' => 'Produk Laris', 'slug' => 'laris', 'sort_order' => 2]);
-        Account::factory()->count(2)->create(['product_id' => $hot->id, 'status' => AccountStatus::Sold]);
-
-        $this->get('/')->assertOk()->assertSeeInOrder(['Pilihan Terbaik', 'Produk Laris', 'Produk Sepi']);
-    }
-
     // ---------- katalog ----------
 
     public function test_catalog_filters_by_category_and_search_and_noindexes_search(): void
     {
         $this->product();
-        $this->product(['name' => 'ChatGPT Plus', 'slug' => 'chatgpt-plus', 'category' => ProductCategory::Ai]);
+        $this->product(['name' => 'ChatGPT Plus', 'slug' => 'chatgpt-plus', 'category_id' => $this->category('ai', 'Akun AI')->id]);
         // Footer juga menampilkan nama produk, jadi isi grid diperiksa lewat data view.
         $grid = fn ($response) => $response->viewData('products')->pluck('slug')->sort()->values()->all();
 
@@ -178,8 +174,8 @@ class StorefrontTest extends TestCase
     public function test_related_products_prefer_the_same_category_and_exclude_itself(): void
     {
         $this->product();
-        $this->product(['name' => 'Spotify Premium', 'slug' => 'spotify', 'category' => ProductCategory::Streaming]);
-        $this->product(['name' => 'Canva Pro', 'slug' => 'canva', 'category' => ProductCategory::Tools]);
+        $this->product(['name' => 'Spotify Premium', 'slug' => 'spotify', 'category_id' => $this->category('streaming', 'Streaming')->id]);
+        $this->product(['name' => 'Canva Pro', 'slug' => 'canva', 'category_id' => $this->category('tools', 'Tools')->id]);
 
         $this->get('/produk/netflix-premium')->assertOk()->assertSeeInOrder(['Produk terkait', 'Spotify Premium', 'Canva Pro']);
     }
@@ -238,5 +234,45 @@ class StorefrontTest extends TestCase
         $this->assertSame([route('vouchers.index')], $active('/voucher'));
         $this->assertSame([route('faq')], $active('/faq'));
         $this->assertSame([], $active('/'));
+    }
+
+    public function test_category_without_active_products_is_hidden_from_filter(): void
+    {
+        $this->product(['name' => 'Spotify Premium', 'slug' => 'spotify', 'category_id' => $this->category('streaming', 'Streaming')->id]);
+        $this->category('kosong', 'Kategori Kosong');
+
+        $this->get('/produk')->assertOk()->assertSee('Streaming')->assertDontSee('Kategori Kosong');
+    }
+
+    public function test_home_shows_one_section_per_category_with_only_its_products(): void
+    {
+        $this->product(['name' => 'Spotify Premium', 'slug' => 'spotify', 'category_id' => $this->category('streaming', 'Streaming')->id]);
+        $this->product(['name' => 'Canva Pro', 'slug' => 'canva', 'category_id' => $this->category('tools', 'Tools')->id]);
+        $this->category('kosong', 'Kategori Kosong');
+
+        $html = $this->get('/')->assertOk()->assertDontSee('Produk Terlaris')->assertDontSee('Kategori Kosong')->getContent();
+
+        preg_match('/id="kategori-streaming".*?<\/section>/s', $html, $streaming);
+        $this->assertStringContainsString('Spotify Premium', $streaming[0]);
+        $this->assertStringNotContainsString('Canva Pro', $streaming[0]);
+    }
+
+    public function test_product_card_has_discount_badge_above_title_instead_of_sold_badge_and_whatsapp_icon_next_to_buy(): void
+    {
+        config(['proakses.whatsapp' => '081234567890']);
+        $product = $this->product(['highlights' => ['Kualitas 4K ultra', 'Profil pribadi']]);
+        Account::factory()->count(2)->create(['product_id' => $product->id, 'status' => AccountStatus::Sold]);
+
+        $this->get('/produk')->assertOk()
+            ->assertSeeInOrder(['Stok', 'Diskon', 'Netflix Premium', 'Kualitas 4K ultra', 'https://wa.me/6281234567890?text=', '>Beli<'], false)
+            ->assertDontSee('akun terjual');
+    }
+
+    public function test_product_card_hides_whatsapp_icon_when_number_is_not_set(): void
+    {
+        config(['proakses.whatsapp' => '']);
+        $this->product();
+
+        $this->get('/produk')->assertOk()->assertDontSee('via WhatsApp');
     }
 }

@@ -3,7 +3,6 @@
 namespace App\Http\Requests\Admin;
 
 use App\Enums\AccountType;
-use App\Enums\ProductCategory;
 use App\Models\Product;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Str;
@@ -39,7 +38,8 @@ class ProductRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:150'],
             'slug' => ['nullable', 'string', 'max:150', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/', Rule::unique('products', 'slug')->ignore($product)],
-            'category' => ['required', Rule::enum(ProductCategory::class)],
+            'category' => ['nullable', 'required_without:new_category', 'string', Rule::exists('product_categories', 'slug')],
+            'new_category' => ['nullable', 'required_without:category', 'string', 'max:60'],
             'account_type' => ['nullable', Rule::enum(AccountType::class)],
             'description' => ['nullable', 'string', 'max:5000'],
             'highlights' => ['nullable', 'array', 'max:10'],
@@ -65,6 +65,7 @@ class ProductRequest extends FormRequest
             'name' => 'Nama produk',
             'slug' => 'Slug',
             'category' => 'Kategori',
+            'new_category' => 'Nama kategori baru',
             'account_type' => 'Jenis akun',
             'description' => 'Deskripsi',
             'highlights' => 'Poin unggulan',

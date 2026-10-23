@@ -24,6 +24,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { AdminHeader } from '@/components/layout/admin-header'
 import { Main } from '@/components/layout/main'
 import { formatRupiah } from '@/lib/format'
+import { CategoryField } from './category-field'
 import { FieldError } from './field-error'
 import { HighlightsField, SpecsField } from './list-fields'
 import {
@@ -129,6 +130,7 @@ export function ProductFormView({
     name: product?.name ?? '',
     slug: product?.slug ?? '',
     category: product?.category ?? options.categories[0]?.value ?? '',
+    new_category: '',
     account_type: product?.account_type ?? '',
     description: product?.description ?? '',
     highlights: product?.highlights?.length ? product.highlights : [''],
@@ -342,20 +344,16 @@ export function ProductFormView({
                   <CardTitle>Kategori</CardTitle>
                 </CardHeader>
                 <CardContent className='space-y-4'>
-                  <div className='space-y-2'>
-                    <Label htmlFor='category'>Kategori</Label>
-                    <Select value={data.category} onValueChange={(v) => setData('category', v)}>
-                      <SelectTrigger id='category' className='w-full'>
-                        <SelectValue placeholder='Pilih kategori' />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {options.categories.map((o) => (
-                          <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FieldError message={errors.category} />
-                  </div>
+                  <CategoryField
+                    categories={options.categories}
+                    category={data.category}
+                    newCategory={data.new_category}
+                    onChange={(category, newCategory) => {
+                      setData('category', category)
+                      setData('new_category', newCategory)
+                    }}
+                    error={errors.category ?? errors.new_category}
+                  />
                   <div className='space-y-2'>
                     <Label htmlFor='account_type'>Jenis akun (stok)</Label>
                     <Select value={data.account_type || NONE} onValueChange={(v) => setData('account_type', v === NONE ? '' : v)}>

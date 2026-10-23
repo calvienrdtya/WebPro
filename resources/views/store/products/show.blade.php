@@ -39,7 +39,7 @@
         'description' => $description,
         'image' => [$image],
         'sku' => $product->slug,
-        'category' => $product->category->label(),
+        'category' => $product->category->name,
         'aggregateRating' => $reviewSummary['count'] > 0 ? [
             '@type' => 'AggregateRating',
             'ratingValue' => $reviewSummary['average'],
@@ -76,7 +76,7 @@
         'itemListElement' => [
             ['@type' => 'ListItem', 'position' => 1, 'name' => 'Beranda', 'item' => route('home')],
             ['@type' => 'ListItem', 'position' => 2, 'name' => 'Produk', 'item' => route('products.index')],
-            ['@type' => 'ListItem', 'position' => 3, 'name' => $product->category->label(), 'item' => route('products.index', ['kategori' => $product->category->value])],
+            ['@type' => 'ListItem', 'position' => 3, 'name' => $product->category->name, 'item' => route('products.index', ['kategori' => $product->category->slug])],
             ['@type' => 'ListItem', 'position' => 4, 'name' => $product->name, 'item' => route('products.show', $product->slug)],
         ],
     ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) !!}</script>
@@ -90,7 +90,7 @@
                 <li aria-hidden="true" class="text-[#D1D5DB]">/</li>
                 <li><a href="{{ route('products.index') }}" class="transition hover:text-[#B45309]">Produk</a></li>
                 <li aria-hidden="true" class="text-[#D1D5DB]">/</li>
-                <li><a href="{{ route('products.index', ['kategori' => $product->category->value]) }}" class="transition hover:text-[#B45309]">{{ $product->category->label() }}</a></li>
+                <li><a href="{{ route('products.index', ['kategori' => $product->category->slug]) }}" class="transition hover:text-[#B45309]">{{ $product->category->name }}</a></li>
                 <li aria-hidden="true" class="text-[#D1D5DB]">/</li>
                 <li aria-current="page" class="font-medium text-[#0A0F1F]">{{ $product->name }}</li>
             </ol>
@@ -102,9 +102,9 @@
                 <div>
                     <div class="relative overflow-hidden rounded-[20px] border border-[#E5E7EB] bg-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.06)]">
                         @if ($product->image_url)
-                            <img src="{{ $product->image_url }}" alt="{{ $product->name }}" width="800" height="640" fetchpriority="high" class="aspect-[5/4] h-full w-full object-cover" />
+                            <img src="{{ $product->image_url }}" alt="{{ $product->name }}" width="800" height="450" fetchpriority="high" class="aspect-video h-full w-full object-cover" />
                         @else
-                            <div class="aspect-[5/4]"></div>
+                            <div class="aspect-video"></div>
                         @endif
                         @if ($first['discount'] > 0)
                             <span class="absolute right-3 top-3 rounded-full bg-gradient-to-r from-[#FBBF24] to-[#F59E0B] px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-wide text-[#0A0F1F] shadow-md shadow-[#F59E0B]/30 sm:right-4 sm:top-4 sm:text-xs">Diskon {{ $first['discount'] }}%</span>
@@ -466,7 +466,7 @@
                                 class="btn-shine flex-1 rounded-xl bg-gradient-to-r from-[#FBBF24] to-[#F59E0B] px-6 py-4 text-center text-base font-bold text-[#0A0F1F] shadow-[0_8px_20px_rgba(245,158,11,0.3)] transition hover:shadow-[0_10px_26px_rgba(245,158,11,0.4)] hover:brightness-105 active:scale-[0.99] disabled:cursor-not-allowed disabled:from-slate-200 disabled:to-slate-200 disabled:text-slate-500 disabled:shadow-none">
                                 {{ $stock > 0 ? 'Beli Sekarang' : 'Stok habis' }}
                             </button>
-                            <a href="{{ \App\Support\Whatsapp::url('Halo ProAkses, saya mau tanya '.$product->name) }}" rel="noopener" class="inline-flex items-center justify-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-5 py-4 text-sm font-semibold text-[#374151] transition hover:border-[#F59E0B]">
+                            <a href="{{ \App\Support\Whatsapp::url(\App\Support\Whatsapp::productMessage($product)) }}" rel="noopener" class="inline-flex items-center justify-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-5 py-4 text-sm font-semibold text-[#374151] transition hover:border-[#F59E0B]">
                                 <x-store.brand-icon name="whatsapp" class="text-base text-[#25D366]" />
                                 Tanya admin
                             </a>

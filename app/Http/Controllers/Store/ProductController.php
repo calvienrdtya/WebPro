@@ -2,12 +2,12 @@
 
 namespace App\Http\Controllers\Store;
 
-use App\Enums\ProductCategory;
 use App\Http\Controllers\Controller;
 use App\Enums\DiscountType;
 use App\Models\Faq;
 use App\Services\VoucherCheck;
 use App\Models\Product;
+use App\Models\ProductCategory;
 use App\Models\ServiceFee;
 use App\Models\UserVoucher;
 use App\Models\Voucher;
@@ -20,13 +20,13 @@ class ProductController extends Controller
 {
     public function index(Request $request): View
     {
-        $category = ProductCategory::tryFrom((string) $request->query('kategori'));
+        $category = ProductCategory::visible()->where('slug', (string) $request->query('kategori'))->first();
         $q = trim((string) $request->query('q'));
 
         $products = Product::active()
             ->withStoreCounts()
             ->with('productVariants.variant')
-            ->when($category, fn ($query) => $query->where('category', $category->value))
+            ->when($category, fn ($query) => $query->where('category_id', $category->id))
             ->search($q)
             ->orderBy('sort_order')->orderBy('name')
             ->paginate(12)
@@ -36,7 +36,7 @@ class ProductController extends Controller
             'products' => $products,
             'category' => $category,
             'q' => $q,
-            'categories' => ProductCategory::cases(),
+            'categories' => ProductCategory::visible()->orderBy('id')->get(),
         ]);
     }
 
@@ -44,7 +44,7 @@ class ProductController extends Controller
     {
         $product = Product::active()
             ->withStoreCounts()
-            ->with('productVariants.variant')
+            ->with('productVariants.variant', 'category')
             ->where('slug', $slug)
             ->firstOrFail();
 
@@ -54,7 +54,7 @@ class ProductController extends Controller
             ->withStoreCounts()
             ->with('productVariants.variant')
             ->whereKeyNot($product->id)
-            ->orderByRaw('category = ? desc', [$product->category->value])
+            ->orderByRaw('category_id = ? desc', [$product->category_id])
             ->orderBy('sort_order')
             ->limit(4)
             ->get();
